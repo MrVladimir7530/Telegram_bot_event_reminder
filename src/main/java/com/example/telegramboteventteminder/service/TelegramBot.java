@@ -4,6 +4,7 @@ package com.example.telegramboteventteminder.service;
 import com.example.telegramboteventteminder.config.BotConfig;
 import com.example.telegramboteventteminder.model.User;
 import com.example.telegramboteventteminder.repository.UserRepository;
+import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,8 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
@@ -66,7 +69,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/help":
                     sendMessage(chatId, HELP_TEXT);
                     break;
-                default: sendMessage(chatId, "Sorry, Bro, this command isn't support(");
+                default:
+                    String answer = EmojiParser.parseToUnicode( "Sorry, Bro, this command isn't support " + ":pensive:");
+                    sendMessage(chatId, answer);
             }
         }
     }
@@ -92,7 +97,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void startCommandReceived(long chatId, String name) {
-        String answer = "Hi, " + name + ", nice to meet you";
+        String answer = EmojiParser.parseToUnicode("Hi, " + name + ", nice to meet you " + ":blush:");
         sendMessage(chatId, answer);
     }
 
@@ -100,11 +105,34 @@ public class TelegramBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
+
+        extracted(message);
+
         try {
             execute(message);
         } catch (TelegramApiException e) {
            log.error("Error occurred: " + e.getMessage());
         }
 
+    }
+
+    private static void extracted(SendMessage message) {
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+
+        KeyboardRow row = new KeyboardRow();
+
+        row.add("weather");
+        row.add("get random joke");
+
+
+        row.add("register");
+        row.add("check my data");
+        row.add("delete my data");
+
+        keyboardRows.add(row);
+        keyboardMarkup.setKeyboard(keyboardRows);
+
+        message.setReplyMarkup(keyboardMarkup);
     }
 }
