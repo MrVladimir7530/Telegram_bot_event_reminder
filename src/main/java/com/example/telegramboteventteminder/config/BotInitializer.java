@@ -1,6 +1,7 @@
 package com.example.telegramboteventteminder.config;
 
-import com.example.eventreminder.service.TelegramBot;
+
+import com.example.telegramboteventteminder.service.TelegramBot;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
