@@ -40,8 +40,17 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Autowired
     private ReminderRepository reminderRepository;
     private final BotConfig CONFIG;
-    private static final String HELP_TEXT = "This has help";
-    private static final String INFO_TEXT = "This has help";
+    private static final String HELP_TEXT = "This bot has command:\n" +
+            "\"/start\", \"get a welcome message\"\n" +
+            "\"/add\", \"adds a new reminder\"\n" +
+            "\"/delete\", \"deletes a current reminder\"\n" +
+            "\"/getAll\", \"gets all reminders\n" +
+            "\"/help\", \"gives help on this bot\"\n" +
+            "\"/info\", \"gives information about this bot\"";
+    private static final String INFO_TEXT = "This bot is needed to remind you of various events.\n" +
+            "To get started you need to write \"start\". In this\n" +
+            "bot you can create and also delete reminders. You can\n" +
+            "use ready-made commands from the menu at the bottom right";
     static final String ERROR_TEXT = "Error occurred: ";
     private static String YES_BUTTON = "YES_BUTTON";
     private static String NO_BUTTON = "NO_BUTTON";
@@ -98,7 +107,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
             }
         } else {
-          prepareAndSendMessage(update.getMessage().getChatId(), "select command");
+            prepareAndSendMessage(update.getMessage().getChatId(), "select command");
         }
     }
 
