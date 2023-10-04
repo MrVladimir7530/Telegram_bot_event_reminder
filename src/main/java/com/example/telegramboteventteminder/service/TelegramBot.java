@@ -118,12 +118,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                 EditMessageText messageText = new EditMessageText();
                 messageText.setChatId(String.valueOf(chatId));
                 messageText.setText(INFO_TEXT);
-                messageText.setMessageId((int)messageId);
+                messageText.setMessageId((int) messageId);
                 executeEditMessage(messageText);
             } else if (callBackData.equals(NO_BUTTON)) {
                 DeleteMessage deleteMessage = new DeleteMessage();
                 deleteMessage.setChatId(String.valueOf(chatId));
-                deleteMessage.setMessageId((int)messageId);
+                deleteMessage.setMessageId((int) messageId);
                 try {
                     execute(deleteMessage);
                 } catch (TelegramApiException e) {
@@ -160,7 +160,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             case "/delete":
                 chooseWay = 3;
                 getAll(update);
-                prepareAndSendMessage(chatId, "Write Number \"chat_id\", which needs to be deleted");
+                prepareAndSendMessage(chatId, "Write Number \"Id\", which needs to be deleted");
                 break;
             case "/getAll":
                 getAll(update);
@@ -179,12 +179,23 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void chooseDataWithTime(Update update) {
         String messageText = update.getMessage().getText();
+//        StringBuilder stringBuilder = new StringBuilder(update.getMessage().getText());
         long chatId = update.getMessage().getChatId();
         try {
             if (messageText.replaceAll("\\s", "").length() == 5) {
+//                StringBuilder stringBuilder = new StringBuilder(messageText);
+                messageText = messageText.replace(' ', ':');
+                messageText = messageText.replace('.', ':');
+                messageText = messageText.replace('/', ':');
                 LocalTime localTime = LocalTime.parse(messageText);
                 localDateTime = LocalDateTime.of(LocalDate.now(), localTime);
             } else {
+                messageText = messageText.replace(' ', 'T');
+                messageText = messageText.replace('\\', '-');
+                messageText = messageText.replace('/', '-');
+                messageText = messageText.replace('.', '-');
+                messageText = messageText.replace('_', '-');
+
                 localDateTime = LocalDateTime.parse(messageText);
             }
             chooseWay = 2;
@@ -207,7 +218,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             reminderRepository.save(reminder);
             chooseWay = 0;
-            prepareAndSendMessage(chatId, "reminder: " + messageText + " successfully added");
+            prepareAndSendMessage(chatId, "reminder: \"" + messageText + "\" successfully added");
         } catch (Exception e) {
             log.error("This reminder is not saved: " + e.getMessage());
         }
@@ -238,9 +249,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             prepareAndSendMessage(chatId, "No reminders");
         }
         for (UserReminder userReminder : collect) {
-            String textToSend = "Id=" + userReminder.getId()
-                    + ", message=" + userReminder.getMessageReminder()
-                    + ", data=" + userReminder.getDataReminder()
+            String textToSend = "(Id=" + userReminder.getId() + ") "
+                    + userReminder.getDataReminder()
+                    + "  " + userReminder.getMessageReminder()
                     + "\n";
             prepareAndSendMessage(chatId, textToSend);
         }
@@ -249,7 +260,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
 
     private void startCommandReceived(long chatId, String name) {
-        String answer = EmojiParser.parseToUnicode("Hi, " + name + ", nice to meet you!" + " :blush:");
+        String answer = EmojiParser.parseToUnicode("Hi, " + name + ", Welcome. To add a new reminder write \"add\"!" + " :blush:");
         log.info("Replied to user " + name);
         sendMessage(chatId, answer);
     }
