@@ -4,6 +4,7 @@ import lombok.*;
 
 import javax.persistence.*;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
 
 
@@ -20,9 +21,7 @@ public class User {
     private String firstName;
     private String lastName;
     private String username;
-    private Timestamp registeredAt;
-    @OneToMany
-    @JoinColumn(name = "user")
-    private List<UserReminder> userReminder;
+    private LocalDateTime registeredAt;
+
 
 }

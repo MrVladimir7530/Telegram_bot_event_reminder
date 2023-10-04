@@ -3,9 +3,12 @@ package com.example.telegramboteventteminder.service;
 
 import com.example.telegramboteventteminder.config.BotConfig;
 import com.example.telegramboteventteminder.model.User;
+import com.example.telegramboteventteminder.model.UserReminder;
+import com.example.telegramboteventteminder.repository.ReminderRepository;
 import com.example.telegramboteventteminder.repository.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.type.LocalDateType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -23,7 +26,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,11 +41,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private EventReminderService eventReminderService;
+    private ReminderRepository reminderRepository;
     private final BotConfig CONFIG;
     private static final String HELP_TEXT = "This has help";
+    static final String ERROR_TEXT = "Error occurred: ";
     private static String YES_BUTTON = "YES_BUTTON";
     private static String NO_BUTTON = "NO_BUTTON";
+    private int chooseWay = 0;
+    private LocalDateTime localDateTime = LocalDateTime.now();
 
     public TelegramBot(BotConfig config) {
         CONFIG = config;
@@ -61,151 +71,155 @@ public class TelegramBot extends TelegramLongPollingBot {
         return CONFIG.getToken();
     }
 
+
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
-            String messageText = update.getMessage().getText();
-            long chatId = update.getMessage().getChatId();
-
-            switch (messageText) {
-                case "/start":
-                    registerUser(update.getMessage());
-                    startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
+            switch (chooseWay) {
+                case 0:
+                    startMenu(update);
                     break;
-                case "/help":
-                    prepareAndSendMessage(chatId, HELP_TEXT);
+                case 1:
+                    chooseDataWithTime(update);
                     break;
-                case "/register":
-                    register(chatId);
+                case 2:
+                    saveEvent(update, localDateTime);
                     break;
-                case "/add":
-                    addNewReminder(chatId);
-                    break;
-                default:
-                    String answer = EmojiParser.parseToUnicode("Sorry, Bro, this command isn't support " + ":pensive:");
-                    prepareAndSendMessage(chatId, answer);
             }
-        } else if (update.hasCallbackQuery()) {
-            String callbackData = update.getCallbackQuery().getData();
-            long messageId = update.getCallbackQuery().getMessage().getMessageId();
-            long chatId = update.getCallbackQuery().getMessage().getChatId();
-
-            if (callbackData.equals(YES_BUTTON)) {
-                executeEditMessageText("You pressed YES button", chatId, (int) messageId);
-            } else if (callbackData.equals(NO_BUTTON)) {
-                executeEditMessageText("You pressed NO button", chatId, (int) messageId);
-            }
+        } else {
+            //todo
+            System.out.println("вывод, что надо выбрать собщение");
         }
     }
 
-    private void executeEditMessageText(String text, long chatId, int messageId) {
-        EditMessageText message = new EditMessageText();
-        message.setChatId(String.valueOf(chatId));
-        message.setText(text);
-        message.setMessageId(messageId);
+    private void startMenu(Update update) {
+        String messageText = update.getMessage().getText();
+        long chatId = update.getMessage().getChatId();
 
+        switch (messageText) {
+            case "/start":
+                registerUser(update.getMessage());
+                startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
+                break;
+            case "/add":
+                chooseWay = 1;
+                prepareAndSendMessage(chatId, "Write the date with time or the time of the event");
+                break;
+            case "/delete":
+
+                break;
+            case "/help":
+
+                break;
+            case "/info":
+
+                break;
+            default:
+                prepareAndSendMessage(chatId, "Sorry, Bro, this command isn't support " + ":pensive:");
+
+        }
+    }
+
+    private void chooseDataWithTime(Update update) {
+        String messageText = update.getMessage().getText();
+        long chatId = update.getMessage().getChatId();
         try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
+            if (messageText.replaceAll("\\s", "").length() == 5) {
+                LocalTime localTime = LocalTime.parse(messageText);
+                localDateTime = LocalDateTime.of(LocalDate.now(), localTime);
+            } else {
+                localDateTime = LocalDateTime.parse(messageText);
+            }
+            chooseWay = 2;
+            prepareAndSendMessage(chatId, "Date: " + localDateTime + ", now enter message");
+        } catch (Exception e) {
+            log.info("Incorrect data entered: " + e.getMessage());
+            prepareAndSendMessage(chatId, "Incorrect data entered, please try again");
         }
     }
 
-    private void register(Long chatId) {
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText("Do you really want to register?");
+    private void saveEvent(Update update, LocalDateTime localDateTime) {
+        String messageText = update.getMessage().getText();
+        long chatId = update.getMessage().getChatId();
 
-        InlineKeyboardMarkup markupInLine = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rowsInLine = new ArrayList<>();
-        List<InlineKeyboardButton> rowInLine = new ArrayList<>();
-
-        var yesButton = new InlineKeyboardButton();
-        yesButton.setText("Yes");
-        yesButton.setCallbackData(YES_BUTTON);
-
-        var noButton = new InlineKeyboardButton();
-        noButton.setText("No");
-        noButton.setCallbackData(NO_BUTTON);
-
-        rowInLine.add(yesButton);
-        rowInLine.add(noButton);
-
-        rowsInLine.add(rowInLine);
-
-        markupInLine.setKeyboard(rowsInLine);
-        message.setReplyMarkup(markupInLine);
-
-        executeSendMessage(message);
-
-    }
-
-    private void addNewReminder(Long chatId) {
+        UserReminder reminder = new UserReminder();
+        reminder.setMessageReminder(messageText);
+        reminder.setDataReminder(localDateTime);
         User user = userRepository.findById(chatId).get();
-        eventReminderService.saveNewReminder(user);
-    }
-
-    private void executeSendMessage(SendMessage message) {
+        reminder.setUser(user);
         try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
+            reminderRepository.save(reminder);
+            chooseWay = 0;
+        } catch (Exception e) {
+            log.error("" + e.getMessage());
         }
+
+
     }
 
-    private void registerUser(Message message) {
-            if (userRepository.findById(message.getChatId()).isEmpty()) {
-                var chatId = message.getChatId();
-                var chat = message.getChat();
-
-                User user = new User();
-
-                user.setChatId(chatId);
-                user.setFirstName(chat.getFirstName());
-                user.setLastName(chat.getLastName());
-                user.setUsername(chat.getUserName());
-                user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
-
-                userRepository.save(user);
-                log.info("user saved: " + user);
-            }
-    }
 
     private void startCommandReceived(long chatId, String name) {
-        String answer = EmojiParser.parseToUnicode("Hi, " + name + ", nice to meet you " + ":blush:");
-        SendMessage sendMessage = prepareAndSendMessage(chatId, answer);
-        executeEditMessageText(sendMessage);
+        String answer = EmojiParser.parseToUnicode("Hi, " + name + ", nice to meet you!" + " :blush:");
+        log.info("Replied to user " + name);
+        sendMessage(chatId, answer);
     }
 
-
-
-    private SendMessage prepareAndSendMessage(long chatId, String textToSend) {
+    private void sendMessage(long chatId, String textToSend) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
-        executeSendMessage(message);
-        return message;
-    }
 
-    private static void executeEditMessageText(SendMessage message) {
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboardRows = new ArrayList<>();
 
         KeyboardRow row = new KeyboardRow();
-
-        row.add("/start");
-        row.add("/info");
-
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-
-        row.add("/register");
-        row.add("/help");
         row.add("/add");
+        row.add("/delete");
+        keyboardRows.add(row);
 
+        row = new KeyboardRow();
+        row.add("/getAll");
+        row.add("/info");
+        row.add("/help");
         keyboardRows.add(row);
         keyboardMarkup.setKeyboard(keyboardRows);
 
         message.setReplyMarkup(keyboardMarkup);
+        executeMessage(message);
     }
+
+    private void prepareAndSendMessage(long chatId, String textToSend) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        executeMessage(message);
+    }
+
+
+    private void executeMessage(SendMessage message) {
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error(ERROR_TEXT + e.getMessage());
+        }
+    }
+
+    private void registerUser(Message message) {
+        if (userRepository.findById(message.getChatId()).isEmpty()) {
+            var chatId = message.getChatId();
+            var chat = message.getChat();
+
+            User user = new User();
+
+            user.setChatId(chatId);
+            user.setFirstName(chat.getFirstName());
+            user.setLastName(chat.getLastName());
+            user.setUsername(chat.getUserName());
+            user.setRegisteredAt(LocalDateTime.now());
+
+            userRepository.save(user);
+            log.info("user saved: " + user);
+        }
+    }
+
 }
