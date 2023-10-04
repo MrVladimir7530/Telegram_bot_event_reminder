@@ -15,11 +15,15 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
@@ -88,8 +92,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
             if (update.getMessage().getText().equals("/cancel")) {
-                //todo
-                chooseWay = 0;
+                confirmCancellation(update);
             } else {
                 switch (chooseWay) {
                     case 0:
@@ -106,8 +109,38 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                 }
             }
+        } else if (update.hasCallbackQuery()) {
+            String callBackData = update.getCallbackQuery().getData();
+            long messageId = update.getCallbackQuery().getMessage().getMessageId();
+            long chatId = update.getCallbackQuery().getMessage().getChatId();
+            if (callBackData.equals(YES_BUTTON)) {
+                chooseWay = 0;
+                EditMessageText messageText = new EditMessageText();
+                messageText.setChatId(String.valueOf(chatId));
+                messageText.setText(INFO_TEXT);
+                messageText.setMessageId((int)messageId);
+                executeEditMessage(messageText);
+            } else if (callBackData.equals(NO_BUTTON)) {
+                DeleteMessage deleteMessage = new DeleteMessage();
+                deleteMessage.setChatId(String.valueOf(chatId));
+                deleteMessage.setMessageId((int)messageId);
+                try {
+                    execute(deleteMessage);
+                } catch (TelegramApiException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
         } else {
             prepareAndSendMessage(update.getMessage().getChatId(), "select command");
+        }
+    }
+
+    private void executeEditMessage(EditMessageText messageText) {
+        try {
+            execute(messageText);
+        } catch (TelegramApiException e) {
+            log.error(ERROR_TEXT + e.getMessage());
         }
     }
 
@@ -278,6 +311,35 @@ public class TelegramBot extends TelegramLongPollingBot {
             userRepository.save(user);
             log.info("user saved: " + user);
         }
+    }
+
+    private void confirmCancellation(Update update) {
+        Long chatId = update.getMessage().getChatId();
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Are you sure you want to cancel the action?" + "");
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInLine = new ArrayList<>();
+        List<InlineKeyboardButton> rowInLine = new ArrayList<>();
+
+        var yesButton = new InlineKeyboardButton();
+
+        yesButton.setText("Yes");
+        yesButton.setCallbackData(YES_BUTTON);
+
+        var noButton = new InlineKeyboardButton();
+
+        noButton.setText("No");
+        noButton.setCallbackData(NO_BUTTON);
+
+        rowInLine.add(yesButton);
+        rowInLine.add(noButton);
+        rowsInLine.add(rowInLine);
+        markup.setKeyboard(rowsInLine);
+        message.setReplyMarkup(markup);
+
+        executeMessage(message);
     }
 
     @Scheduled(cron = "0 * * * * *")
