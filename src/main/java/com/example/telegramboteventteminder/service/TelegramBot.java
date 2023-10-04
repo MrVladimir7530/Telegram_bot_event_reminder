@@ -8,31 +8,26 @@ import com.example.telegramboteventteminder.repository.ReminderRepository;
 import com.example.telegramboteventteminder.repository.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.type.LocalDateType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -85,6 +80,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case 2:
                     saveEvent(update, localDateTime);
                     break;
+                case 4:
+                    deleteEvent(update);
+                    break;
             }
         } else {
             //todo
@@ -106,7 +104,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                 prepareAndSendMessage(chatId, "Write the date with time or the time of the event");
                 break;
             case "/delete":
-
+                chooseWay = 4;
+                getAll(update);
+                prepareAndSendMessage(chatId, "Write Number \"chat_id\", which needs to be deleted");
+                break;
+            case "/getAll":
+                getAll(update);
                 break;
             case "/help":
 
@@ -150,10 +153,43 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             reminderRepository.save(reminder);
             chooseWay = 0;
+            prepareAndSendMessage(chatId, "reminder: " + messageText + " successfully added");
         } catch (Exception e) {
-            log.error("" + e.getMessage());
+            log.error("This reminder is not saved: " + e.getMessage());
         }
+    }
 
+    private void deleteEvent(Update update) {
+        String text = update.getMessage().getText();
+        long chatId = update.getMessage().getChatId();
+
+        try {
+            Long idReminder = Long.valueOf(text);
+            reminderRepository.deleteById(idReminder);
+            chooseWay = 0;
+            prepareAndSendMessage(chatId, "This reminder was deleted successfully");
+        } catch (Exception e) {
+            log.info("Incorrect data entered" + e.getMessage());
+            prepareAndSendMessage(chatId, "Incorrect data entered, please try again");
+        }
+    }
+
+    private void getAll(Update update) {
+        long chatId = update.getMessage().getChatId();
+
+        List<UserReminder> collect = reminderRepository.findAll()
+                .stream()
+                .collect(Collectors.toList());
+        if (collect.isEmpty()) {
+            prepareAndSendMessage(chatId, "No reminders");
+        }
+        for (UserReminder userReminder : collect) {
+            String textToSend = "Id=" + userReminder.getId()
+                    + ", message=" + userReminder.getMessageReminder()
+                    + ", data=" + userReminder.getDataReminder()
+                    + "\n";
+            prepareAndSendMessage(chatId, textToSend);
+        }
 
     }
 
