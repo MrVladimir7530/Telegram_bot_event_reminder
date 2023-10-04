@@ -9,6 +9,7 @@ import com.example.telegramboteventteminder.repository.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
@@ -25,6 +26,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,6 +41,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private ReminderRepository reminderRepository;
     private final BotConfig CONFIG;
     private static final String HELP_TEXT = "This has help";
+    private static final String INFO_TEXT = "This has help";
     static final String ERROR_TEXT = "Error occurred: ";
     private static String YES_BUTTON = "YES_BUTTON";
     private static String NO_BUTTON = "NO_BUTTON";
@@ -49,6 +52,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         CONFIG = config;
         List<BotCommand> listOfCommand = new ArrayList<>();
         listOfCommand.add(new BotCommand("/start", "get a welcome message"));
+        listOfCommand.add(new BotCommand("/add", "adds a new reminder"));
+        listOfCommand.add(new BotCommand("/delete", "deletes a current reminder"));
+        listOfCommand.add(new BotCommand("/getAll", "gets all reminders"));
+        listOfCommand.add(new BotCommand("/help", "gives help on this bot"));
+        listOfCommand.add(new BotCommand("/info", "gives information about this bot"));
         try {
             this.execute(new SetMyCommands(listOfCommand, new BotCommandScopeDefault(), null));
         } catch (TelegramApiException e) {
@@ -70,23 +78,27 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
-            switch (chooseWay) {
-                case 0:
-                    startMenu(update);
-                    break;
-                case 1:
-                    chooseDataWithTime(update);
-                    break;
-                case 2:
-                    saveEvent(update, localDateTime);
-                    break;
-                case 4:
-                    deleteEvent(update);
-                    break;
+            if (update.getMessage().getText().equals("/cancel")) {
+                //todo
+                chooseWay = 0;
+            } else {
+                switch (chooseWay) {
+                    case 0:
+                        startMenu(update);
+                        break;
+                    case 1:
+                        chooseDataWithTime(update);
+                        break;
+                    case 2:
+                        saveEvent(update, localDateTime);
+                        break;
+                    case 3:
+                        deleteEvent(update);
+                        break;
+                }
             }
         } else {
-            //todo
-            System.out.println("вывод, что надо выбрать собщение");
+          prepareAndSendMessage(update.getMessage().getChatId(), "select command");
         }
     }
 
@@ -104,7 +116,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 prepareAndSendMessage(chatId, "Write the date with time or the time of the event");
                 break;
             case "/delete":
-                chooseWay = 4;
+                chooseWay = 3;
                 getAll(update);
                 prepareAndSendMessage(chatId, "Write Number \"chat_id\", which needs to be deleted");
                 break;
@@ -112,10 +124,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                 getAll(update);
                 break;
             case "/help":
-
+                prepareAndSendMessage(chatId, HELP_TEXT);
                 break;
             case "/info":
-
+                prepareAndSendMessage(chatId, INFO_TEXT);
                 break;
             default:
                 prepareAndSendMessage(chatId, "Sorry, Bro, this command isn't support " + ":pensive:");
@@ -211,10 +223,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         KeyboardRow row = new KeyboardRow();
         row.add("/add");
         row.add("/delete");
+        row.add("/getAll");
         keyboardRows.add(row);
 
         row = new KeyboardRow();
-        row.add("/getAll");
+        row.add("/cancel");
         row.add("/info");
         row.add("/help");
         keyboardRows.add(row);
@@ -255,6 +268,18 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             userRepository.save(user);
             log.info("user saved: " + user);
+        }
+    }
+
+    @Scheduled(cron = "0 * * * * *")
+    private void checkReminderAndSendToUser() {
+        List<UserReminder> all = reminderRepository.findAll();
+        for (UserReminder userReminder : all) {
+            if (userReminder.getDataReminder().truncatedTo(ChronoUnit.MINUTES).equals(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))) {
+                Long chatId = userReminder.getUser().getChatId();
+                prepareAndSendMessage(chatId, "reminder: " + userReminder.getMessageReminder());
+                reminderRepository.deleteById(userReminder.getId());
+            }
         }
     }
 
