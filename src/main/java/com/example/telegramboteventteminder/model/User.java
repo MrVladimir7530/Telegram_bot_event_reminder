@@ -4,6 +4,7 @@ import lombok.*;
 
 import javax.persistence.*;
 import java.sql.Timestamp;
+import java.util.List;
 
 
 @AllArgsConstructor
@@ -20,5 +21,8 @@ public class User {
     private String lastName;
     private String username;
     private Timestamp registeredAt;
+    @OneToMany
+    @JoinColumn(name = "user")
+    private List<UserReminder> userReminder;
 
 }

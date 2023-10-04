@@ -33,8 +33,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private EventReminderService eventReminderService;
     private final BotConfig CONFIG;
-    private static final String HELP_TEXT = "";
+    private static final String HELP_TEXT = "This has help";
     private static String YES_BUTTON = "YES_BUTTON";
     private static String NO_BUTTON = "NO_BUTTON";
 
@@ -71,14 +73,17 @@ public class TelegramBot extends TelegramLongPollingBot {
                     startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
                     break;
                 case "/help":
-                    sendMessage(chatId, HELP_TEXT);
+                    prepareAndSendMessage(chatId, HELP_TEXT);
                     break;
                 case "/register":
                     register(chatId);
                     break;
+                case "/add":
+                    addNewReminder(chatId);
+                    break;
                 default:
                     String answer = EmojiParser.parseToUnicode("Sorry, Bro, this command isn't support " + ":pensive:");
-                    sendMessage(chatId, answer);
+                    prepareAndSendMessage(chatId, answer);
             }
         } else if (update.hasCallbackQuery()) {
             String callbackData = update.getCallbackQuery().getData();
@@ -131,16 +136,24 @@ public class TelegramBot extends TelegramLongPollingBot {
         markupInLine.setKeyboard(rowsInLine);
         message.setReplyMarkup(markupInLine);
 
+        executeSendMessage(message);
+
+    }
+
+    private void addNewReminder(Long chatId) {
+        User user = userRepository.findById(chatId).get();
+        eventReminderService.saveNewReminder(user);
+    }
+
+    private void executeSendMessage(SendMessage message) {
         try {
             execute(message);
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
-
     }
 
     private void registerUser(Message message) {
-        if (userRepository.findById(message.getChatId()).isEmpty()) {
             if (userRepository.findById(message.getChatId()).isEmpty()) {
                 var chatId = message.getChatId();
                 var chat = message.getChat();
@@ -156,27 +169,22 @@ public class TelegramBot extends TelegramLongPollingBot {
                 userRepository.save(user);
                 log.info("user saved: " + user);
             }
-        }
     }
 
     private void startCommandReceived(long chatId, String name) {
         String answer = EmojiParser.parseToUnicode("Hi, " + name + ", nice to meet you " + ":blush:");
-        sendMessage(chatId, answer);
+        SendMessage sendMessage = prepareAndSendMessage(chatId, answer);
+        executeEditMessageText(sendMessage);
     }
 
-    private void sendMessage(long chatId, String textToSend) {
+
+
+    private SendMessage prepareAndSendMessage(long chatId, String textToSend) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
-
-        executeEditMessageText(message);
-
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
-        }
-
+        executeSendMessage(message);
+        return message;
     }
 
     private static void executeEditMessageText(SendMessage message) {
@@ -185,15 +193,15 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         KeyboardRow row = new KeyboardRow();
 
-        row.add("weather");
-        row.add("get random joke");
+        row.add("/start");
+        row.add("/info");
 
         keyboardRows.add(row);
         row = new KeyboardRow();
 
-        row.add("register");
-        row.add("check my data");
-        row.add("delete my data");
+        row.add("/register");
+        row.add("/help");
+        row.add("/add");
 
         keyboardRows.add(row);
         keyboardMarkup.setKeyboard(keyboardRows);
