@@ -34,7 +34,6 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -51,14 +50,15 @@ public class TelegramBot extends TelegramLongPollingBot {
             "\"/delete\", \"deletes a current reminder\"\n" +
             "\"/getAll\", \"gets all reminders\n" +
             "\"/help\", \"gives help on this bot\"\n" +
-            "\"/info\", \"gives information about this bot\"";
+            "\"/info\", \"gives information about this bot\"\n" +
+            "\"/cancel\", \"cancels the action and returns to the main menu\"";
     private static final String INFO_TEXT = "This bot is needed to remind you of various events.\n" +
-            "To get started you need to write \"start\". In this\n" +
+            "To get started you need to write \"/start\". In this\n" +
             "bot you can create and also delete reminders. You can\n" +
             "use ready-made commands from the menu at the bottom right";
     static final String ERROR_TEXT = "Error occurred: ";
-    private static String YES_BUTTON = "YES_BUTTON";
-    private static String NO_BUTTON = "NO_BUTTON";
+    private static final String YES_BUTTON = "YES_BUTTON";
+    private static final String NO_BUTTON = "NO_BUTTON";
     private int chooseWay = 0;
     private LocalDateTime localDateTime = LocalDateTime.now();
 
@@ -205,8 +205,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                     .replace(7,8,"-")
                     .replace(10,11, "T")
                     .replace(13,14,":");
-
                 localDateTime = LocalDateTime.parse(stringBuilder);
+            }
+            LocalDateTime localDateTimeNow = LocalDateTime.now();
+            if (localDateTimeNow.truncatedTo(ChronoUnit.MINUTES).isAfter(localDateTime.truncatedTo(ChronoUnit.MINUTES))) {
+                prepareAndSendMessage(chatId, "This date has already passed");
+                return;
             }
             chooseWay = 2;
             prepareAndSendMessage(chatId, "Date: " + localDateTime + ", now enter message");
@@ -252,9 +256,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private List<?extends UserReminder> getAll(Update update) {
         long chatId = update.getMessage().getChatId();
 
-        List<UserReminder> collect = reminderRepository.findAll()
-                .stream()
-                .collect(Collectors.toList());
+        List<UserReminder> collect = new ArrayList<>(reminderRepository.findAll());
         if (collect.isEmpty()) {
             prepareAndSendMessage(chatId, "No reminders");
             return collect;
