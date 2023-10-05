@@ -27,6 +27,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -63,6 +64,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public TelegramBot(BotConfig config) {
         CONFIG = config;
+    }
+
+    @PostConstruct
+    public void init() {
         List<BotCommand> listOfCommand = new ArrayList<>();
         listOfCommand.add(new BotCommand("/start", "get a welcome message"));
         listOfCommand.add(new BotCommand("/add", "adds a new reminder"));
@@ -155,11 +160,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                 break;
             case "/add":
                 chooseWay = 1;
-                prepareAndSendMessage(chatId, "Write the date with time or the time of the event");
+                prepareAndSendMessage(chatId, "Write the date with time or the time of the event.\n" +
+                        "In format: \"yyyy\\mm\\dd\\ hh:mm\" or \"hh:mm\"\n" +
+                        "For example: 2024\\02\\15 15:21 or 15:21");
                 break;
             case "/delete":
+                if (getAll(update).isEmpty()) {
+                    break;
+                }
                 chooseWay = 3;
-                getAll(update);
                 prepareAndSendMessage(chatId, "Write Number \"Id\", which needs to be deleted");
                 break;
             case "/getAll":
@@ -179,24 +188,25 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void chooseDataWithTime(Update update) {
         String messageText = update.getMessage().getText();
-//        StringBuilder stringBuilder = new StringBuilder(update.getMessage().getText());
+        messageText = messageText.trim();
         long chatId = update.getMessage().getChatId();
         try {
-            if (messageText.replaceAll("\\s", "").length() == 5) {
-//                StringBuilder stringBuilder = new StringBuilder(messageText);
-                messageText = messageText.replace(' ', ':');
-                messageText = messageText.replace('.', ':');
-                messageText = messageText.replace('/', ':');
-                LocalTime localTime = LocalTime.parse(messageText);
+            if (messageText.length() <= 5) {
+                if (messageText.length() == 4) {
+                    messageText = "0" + messageText;
+                }
+            StringBuilder stringBuilder = new StringBuilder(messageText);
+                stringBuilder.replace(2, 3, ":");
+                LocalTime localTime = LocalTime.parse(stringBuilder);
                 localDateTime = LocalDateTime.of(LocalDate.now(), localTime);
             } else {
-                messageText = messageText.replace(' ', 'T');
-                messageText = messageText.replace('\\', '-');
-                messageText = messageText.replace('/', '-');
-                messageText = messageText.replace('.', '-');
-                messageText = messageText.replace('_', '-');
+            StringBuilder stringBuilder = new StringBuilder(messageText);
+            stringBuilder.replace(4, 5, "-")
+                    .replace(7,8,"-")
+                    .replace(10,11, "T")
+                    .replace(13,14,":");
 
-                localDateTime = LocalDateTime.parse(messageText);
+                localDateTime = LocalDateTime.parse(stringBuilder);
             }
             chooseWay = 2;
             prepareAndSendMessage(chatId, "Date: " + localDateTime + ", now enter message");
@@ -239,7 +249,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void getAll(Update update) {
+    private List<?extends UserReminder> getAll(Update update) {
         long chatId = update.getMessage().getChatId();
 
         List<UserReminder> collect = reminderRepository.findAll()
@@ -247,6 +257,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 .collect(Collectors.toList());
         if (collect.isEmpty()) {
             prepareAndSendMessage(chatId, "No reminders");
+            return collect;
         }
         for (UserReminder userReminder : collect) {
             String textToSend = "(Id=" + userReminder.getId() + ") "
@@ -255,12 +266,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                     + "\n";
             prepareAndSendMessage(chatId, textToSend);
         }
-
+        return collect;
     }
 
 
     private void startCommandReceived(long chatId, String name) {
-        String answer = EmojiParser.parseToUnicode("Hi, " + name + ", Welcome. To add a new reminder write \"add\"!" + " :blush:");
+        String answer = EmojiParser.parseToUnicode("Hi, " + name + ", Welcome. To add a new reminder write \"/add\"!" + " :blush:");
         log.info("Replied to user " + name);
         sendMessage(chatId, answer);
     }
