@@ -80,6 +80,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             log.error("Error setting bot's command list " + e.getMessage());
         }
+        checkReminderThatHavePassed();
     }
 
     @Override
@@ -368,14 +369,22 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Scheduled(cron = "0 * * * * *")
     private void checkReminderAndSendToUser() {
-        List<UserReminder> all = reminderRepository.findAll();
-        for (UserReminder userReminder : all) {
-            if (userReminder.getDataReminder().truncatedTo(ChronoUnit.MINUTES).equals(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))) {
-                Long chatId = userReminder.getUser().getChatId();
-                prepareAndSendMessage(chatId, "reminder: " + userReminder.getMessageReminder());
-                reminderRepository.deleteById(userReminder.getId());
-            }
+        List<UserReminder> allByDataReminder = reminderRepository.findAllByDataReminder(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES));
+        for (UserReminder userReminder : allByDataReminder) {
+            Long chatId = userReminder.getUser().getChatId();
+            prepareAndSendMessage(chatId, "reminder: " + userReminder.getMessageReminder());
+            reminderRepository.deleteById(userReminder.getId());
         }
     }
+
+    private void checkReminderThatHavePassed() {
+        List<UserReminder> allByDataReminderIsBefore = reminderRepository.findAllByDataReminderIsBefore(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES));
+        for (UserReminder userReminder : allByDataReminderIsBefore) {
+            Long chatId = userReminder.getUser().getChatId();
+            prepareAndSendMessage(chatId, "reminder: " + userReminder.getMessageReminder());
+            reminderRepository.deleteById(userReminder.getId());
+        }
+    }
+
 
 }
