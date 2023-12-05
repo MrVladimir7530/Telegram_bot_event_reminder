@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @PropertySource("application.properties")
 public class BotConfig {
     @Value("${bot.name}")
-    String botName;
+    private String botName;
     @Value("${bot.token}")
-    String token;
+    private String token;
 }

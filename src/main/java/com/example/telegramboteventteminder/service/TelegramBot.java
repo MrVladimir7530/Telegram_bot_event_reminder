@@ -64,22 +64,22 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public TelegramBot(BotConfig config) {
         CONFIG = config;
-    }
-
-    @PostConstruct
-    public void init() {
         List<BotCommand> listOfCommand = new ArrayList<>();
         listOfCommand.add(new BotCommand("/start", "get a welcome message"));
         listOfCommand.add(new BotCommand("/add", "adds a new reminder"));
         listOfCommand.add(new BotCommand("/delete", "deletes a current reminder"));
         listOfCommand.add(new BotCommand("/getAll", "gets all reminders"));
-        listOfCommand.add(new BotCommand("/help", "gives help on this bot"));
         listOfCommand.add(new BotCommand("/info", "gives information about this bot"));
+        listOfCommand.add(new BotCommand("/help", "gives help on this bot"));
         try {
             this.execute(new SetMyCommands(listOfCommand, new BotCommandScopeDefault(), null));
         } catch (TelegramApiException e) {
             log.error("Error setting bot's command list " + e.getMessage());
         }
+    }
+
+    @PostConstruct
+    public void init() {
         checkReminderThatHavePassed();
     }
 
@@ -257,7 +257,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private List<?extends UserReminder> getAll(Update update) {
         long chatId = update.getMessage().getChatId();
 
-        List<UserReminder> collect = new ArrayList<>(reminderRepository.findAll());
+        List<UserReminder> collect = new ArrayList<>(reminderRepository.findByUser_ChatId(chatId));
         if (collect.isEmpty()) {
             prepareAndSendMessage(chatId, "No reminders");
             return collect;
@@ -267,7 +267,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     + userReminder.getDataReminder()
                     + "  " + userReminder.getMessageReminder()
                     + "\n";
-            prepareAndSendMessage(chatId, textToSend);
+                prepareAndSendMessage(chatId, textToSend);
         }
         return collect;
     }

@@ -9,4 +9,5 @@ import java.util.List;
 public interface ReminderRepository extends JpaRepository<UserReminder, Long> {
     List<UserReminder> findAllByDataReminder(LocalDateTime localDateTime);
     List<UserReminder> findAllByDataReminderIsBefore(LocalDateTime localDateTime);
+    List<UserReminder> findByUser_ChatId(Long chatId);
 }
